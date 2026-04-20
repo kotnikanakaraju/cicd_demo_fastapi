@@ -46,7 +46,7 @@ jobs:
         run: docker build -t fastapi-app .
 
       - name: Docker Compose Up
-        run: docker-compose up -d
+        run: docker-compose up --build
 
       - name: Check Running Containers
         run: docker ps
