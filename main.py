@@ -1,25 +1,45 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy.exc import OperationalError
 import os
+import time
 
-
-
-DB_HOST = os.getenv("DB_HOST", "localhost")
-
-DATABASE_URL = f"postgresql://postgres:postgres@{DB_HOST}:5432/mydb"
-# DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432/mydb")
+# ----------------------
+# DB CONFIG
+# ----------------------
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@localhost:5432/mydb"
+)
 
 engine = create_engine(DATABASE_URL)
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 Base = declarative_base()
 
+# ----------------------
+# FASTAPI APP
+# ----------------------
 app = FastAPI()
 
+# ----------------------
+# STARTUP EVENT (DB RETRY)
+# ----------------------
+@app.on_event("startup")
+def startup():
+    for i in range(10):
+        try:
+            Base.metadata.create_all(bind=engine)
+            print("✅ DB Connected!")
+            break
+        except OperationalError:
+            print("⏳ DB not ready, retrying...")
+            time.sleep(3)
 
 # ----------------------
-# DB MODEL
+# MODEL
 # ----------------------
 class User(Base):
     __tablename__ = "users"
@@ -27,11 +47,6 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String)
     email = Column(String, unique=True, index=True)
-
-
-# Create tables
-Base.metadata.create_all(bind=engine)
-
 
 # ----------------------
 # DEPENDENCY
@@ -43,12 +58,9 @@ def get_db():
     finally:
         db.close()
 
-
 # ----------------------
 # CRUD APIs
 # ----------------------
-
-# Create
 @app.post("/users/")
 def create_user(name: str, email: str, db: Session = Depends(get_db)):
     user = User(name=name, email=email)
@@ -57,14 +69,10 @@ def create_user(name: str, email: str, db: Session = Depends(get_db)):
     db.refresh(user)
     return user
 
-
-# Read all
 @app.get("/users/")
 def get_users(db: Session = Depends(get_db)):
     return db.query(User).all()
 
-
-# Read one
 @app.get("/users/{user_id}")
 def get_user(user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
@@ -72,8 +80,6 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
-
-# Update
 @app.put("/users/{user_id}")
 def update_user(user_id: int, name: str, email: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
@@ -85,8 +91,6 @@ def update_user(user_id: int, name: str, email: str, db: Session = Depends(get_d
     db.commit()
     return user
 
-
-# Delete
 @app.delete("/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
