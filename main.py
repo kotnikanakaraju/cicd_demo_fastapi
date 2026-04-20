@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/mydb"
+DATABASE_URL = "postgresql://postgres:postgres@db:5432/mydb"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
